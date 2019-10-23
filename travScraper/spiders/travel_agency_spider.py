@@ -1,46 +1,51 @@
 import csv ,scrapy,json, re
+from collections import OrderedDict
+
 from scrapy import FormRequest
 
 class travel_agency(scrapy.Spider):
     name = "agencyCrawler"  # spider 이름
 
     outfile = open("myfile.csv", "a+", newline="")
+
+
+
     writer = csv.writer(outfile)
 
     cnt = 0;
 
     def start_requests(self):
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-        urls = [
-            'https://www.ybtour.co.kr/CMMN/header.ajax'
-        ]
-        self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
-                              "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
-
-        for i, url in enumerate(urls):
-            yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
+        # urls = [
+        #     'https://www.ybtour.co.kr/CMMN/header.ajax'
+        # ]
+        # self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
+        #                       "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
+        #
+        # for i, url in enumerate(urls):
+        #     yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
 
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-        # params = {
-        #     'menu': 'PKG',
-        #     'dspSid': '',
-        #     'evCd': ''
-        # }
-        #
+        params = {
+            'menu': 'PKG',
+            'dspSid': '',
+            'evCd': ''
+        }
+
         # params.__setitem__('dspSid', "AADC004")
         # params.__setitem__('evCd', "CIP1147-191105KE00")
-        #
-        # # params.__setitem__('dspSid', "AAAA002")
-        # # params.__setitem__('evCd', "EWP2318-191026OZ00")
-        #
-        # # params.__setitem__('dspSid', "ABBC001")
-        # # params.__setitem__('evCd', "ATF1048-191019KE00")
-        #
-        # request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
-        #                       meta={'cookiejar': 1}
-        #                       , callback=self.detailPage, method='GET', formdata=params)
-        # yield request
+
+        params.__setitem__('dspSid', "AAAA002")
+        params.__setitem__('evCd', "EWP2318-191026OZ00")
+
+        # params.__setitem__('dspSid', "ABBC001")
+        # params.__setitem__('evCd', "ATF1048-191019KE00")
+
+        request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
+                              meta={'cookiejar': 1}
+                              , callback=self.detailPage, method='GET', formdata=params)
+        yield request
 
         ########################################################################################################################
 
@@ -71,8 +76,8 @@ class travel_agency(scrapy.Spider):
                                       meta={'cookiejar': response.meta['cookiejar']}
                                       , callback=self.MenuPage, method='POST', formdata=params)
                 yield request
-            # if i > 10:
-            #     break
+            if i > 3:
+                break
 
     def MenuPage(self, response):
         rdata = response.body.decode("utf-8")
@@ -142,14 +147,23 @@ class travel_agency(scrapy.Spider):
 
         # print("여행 일정 : ", len(detail_Itinerary))
         # str(detail_Itinerary[0])
+
+        tempLoc = "";
+        spost = OrderedDict()
+
         for k in range(len(detail_Itinerary)):
             day = response.xpath('//*[ @ id = "anchor_day'+ str(k+1) +'"]/h3/text()').extract()
             date = response.xpath('//*[ @ id = "anchor_day' + str(k+1) + '"]/span/text()').extract()
+            spost["days"] = day[0]
+            spost["dates"] = date[0]
+
             print("일차 : " + day[0])
             print("\t날짜 - 지역 : " + date[0])
 
             location = response.xpath('//*[@id="tab_page1"]/div/div['+str(k+1)+']/div/div').extract()
             # print(len(location))
+            locationList = list()
+            locationList.clear()
             for c in range(len(location)):
                 baseXpath = '//*[@id="tab_page1"]/div/div[' + str(k + 1) + ']/div/div[' + str(c + 1) + ']'
 
@@ -162,29 +176,53 @@ class travel_agency(scrapy.Spider):
                 imageText = response.xpath(baseXpath + '/div/div/ul/li/p').extract()
 
                 # // *[ @ id = "tab_page1"] / div[3] / div[1] / div[3] / div / h3
-
                 if len(tempLocation) > 0:
-                    print("\t\t거점 : " + tempLocation[0])
+                    print("\t\t거점 : " + tempLocation[0] + "size : " + str(len(tempLocation)))
+                    if tempLoc != tempLocation[0]:
+                        if len(tempLoc) != 0:
+                            includeData = OrderedDict()
+                            includeData[tempLoc] = sp_content
+                            locationList.append(includeData)
+                            # print(json.dumps(locationList, ensure_ascii=False, indent="\t"))
+
+                        print("tempLoc : "+tempLoc + "  tempL[0] : " + tempLocation[0])
+
+                        sp_content = OrderedDict()
+                        tempLoc = tempLocation[0]
+                        # sp_content[tempLoc]={}
+
+
                     # print(subSchedule)
 
                 if len(schedule) > 0:
-                    print("\t\t일정 설명 : " + schedule[0])
+                    print("\t\t일정 설명 : " + schedule[0]+ "size : " + str(len(schedule)))
+                    sp_content["Description"] = schedule[0]
 
                 if len(subSchedule) > 0:
                     scheduleTxt = re.sub('<[^>]*>', '', str(subSchedule[0])).strip()
                     print("\t\t추가 설명 : " + scheduleTxt)
+                    sp_content["detail_Description"] = scheduleTxt
 
                 # print("\t\t\t추가 설명 : " + nohtmlstr.strip())
                 if len(imageName) > 0:
                     for aa in range(len(imageName)):
                         print("\t\t사진 이름 : " + imageName[aa])
+                        sp_content["pic_name"] = imageName[aa]
 
                         for bb in range(len(imagePath)):
                             print("\t\t사진 경로 : " + imagePath[bb])
+                            # sp_content["pic_path"].__add__(imagePath[bb])
 
                         if len(imageText) > 0:
                             imgDescription = re.sub('<[^>]*>', '', str(imageText[aa])).strip()
                             print("\t\t사진 설명 : " + imgDescription)
+                            sp_content["pic_des"] = imgDescription
+
+
+            # print(locationList)
+            # print(json.dumps(locationList, ensure_ascii=False, indent="\t"))
+            spost["loaction"] = locationList
+            print(json.dumps(spost, ensure_ascii=False, indent="\t"))
 
             print()
 
