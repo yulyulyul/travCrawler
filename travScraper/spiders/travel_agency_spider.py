@@ -33,11 +33,11 @@ class travel_agency(scrapy.Spider):
             'evCd': ''
         }
 
-        # params.__setitem__('dspSid', "AADC004")
-        # params.__setitem__('evCd', "CIP1147-191105KE00")
+        params.__setitem__('dspSid', "AADC004")
+        params.__setitem__('evCd', "CIP1147-191105KE00")
 
-        params.__setitem__('dspSid', "AAAA002")
-        params.__setitem__('evCd', "EWP2318-191026OZ00")
+        # params.__setitem__('dspSid', "AAAA002")
+        # params.__setitem__('evCd', "EWP2318-191026OZ00")
 
         # params.__setitem__('dspSid', "ABBC001")
         # params.__setitem__('evCd', "ATF1048-191019KE00")
@@ -148,7 +148,7 @@ class travel_agency(scrapy.Spider):
         # print("여행 일정 : ", len(detail_Itinerary))
         # str(detail_Itinerary[0])
 
-        tempLoc = "";
+
         spost = OrderedDict()
 
         for k in range(len(detail_Itinerary)):
@@ -164,6 +164,7 @@ class travel_agency(scrapy.Spider):
             # print(len(location))
             locationList = list()
             locationList.clear()
+            tempLoc = ""
             for c in range(len(location)):
                 baseXpath = '//*[@id="tab_page1"]/div/div[' + str(k + 1) + ']/div/div[' + str(c + 1) + ']'
 
@@ -209,9 +210,11 @@ class travel_agency(scrapy.Spider):
                         print("\t\t사진 이름 : " + imageName[aa])
                         sp_content["pic_name"] = imageName[aa]
 
+                        pathList = list()
                         for bb in range(len(imagePath)):
+                            pathList.append(imagePath[bb])
                             print("\t\t사진 경로 : " + imagePath[bb])
-                            # sp_content["pic_path"].__add__(imagePath[bb])
+                        sp_content["pic_path"] = pathList
 
                         if len(imageText) > 0:
                             imgDescription = re.sub('<[^>]*>', '', str(imageText[aa])).strip()
@@ -221,6 +224,11 @@ class travel_agency(scrapy.Spider):
 
             # print(locationList)
             # print(json.dumps(locationList, ensure_ascii=False, indent="\t"))
+
+            includeData2 = OrderedDict()
+            includeData2[tempLoc] = sp_content
+            locationList.append(includeData2)
+
             spost["loaction"] = locationList
             print(json.dumps(spost, ensure_ascii=False, indent="\t"))
 
