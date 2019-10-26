@@ -1,52 +1,53 @@
-import csv ,scrapy,json, re
+import csv ,scrapy,json, re, pymongo
 from collections import OrderedDict
-
 from scrapy import FormRequest
+
+from travScraper.spiders.dbinfo import mongoip, mongopwd, mongoid
+
+conn = pymongo.MongoClient('mongodb://'+ mongoid +':'+mongopwd+'@'+mongoip, 30121)
+db = conn.get_database('trav')
+pakage = db.get_collection('pakage')
 
 class travel_agency(scrapy.Spider):
     name = "agencyCrawler"  # spider 이름
 
     outfile = open("myfile.csv", "a+", newline="")
-
-
-
     writer = csv.writer(outfile)
 
     cnt = 0;
 
     def start_requests(self):
+
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-        # urls = [
-        #     'https://www.ybtour.co.kr/CMMN/header.ajax'
-        # ]
-        # self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
-        #                       "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
+        urls = [
+            'https://www.ybtour.co.kr/CMMN/header.ajax'
+        ]
+        self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
+                              "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
+
+        for i, url in enumerate(urls):
+            yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
+        # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+        # params = {
+        #     'menu': 'PKG',
+        #     'dspSid': '',
+        #     'evCd': ''
+        # }
         #
-        # for i, url in enumerate(urls):
-        #     yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
-
-        # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-        params = {
-            'menu': 'PKG',
-            'dspSid': '',
-            'evCd': ''
-        }
-
-        params.__setitem__('dspSid', "AADC004")
-        params.__setitem__('evCd', "CIP1147-191105KE00")
-
-        # params.__setitem__('dspSid', "AAAA002")
-        # params.__setitem__('evCd', "EWP2318-191026OZ00")
-
+        # # params.__setitem__('dspSid', "AADC004")
+        # # params.__setitem__('evCd', "CIP1147-191105KE00")
+        #
+        # # params.__setitem__('dspSid', "AAAA002")
+        # # params.__setitem__('evCd', "EWP2318-191026OZ00")
+        #
         # params.__setitem__('dspSid', "ABBC001")
         # params.__setitem__('evCd', "ATF1048-191019KE00")
-
-        request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
-                              meta={'cookiejar': 1}
-                              , callback=self.detailPage, method='GET', formdata=params)
-        yield request
-
+        #
+        # request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
+        #                       meta={'cookiejar': 1}
+        #                       , callback=self.detailPage, method='GET', formdata=params)
+        # yield request
         ########################################################################################################################
 
 
@@ -76,8 +77,6 @@ class travel_agency(scrapy.Spider):
                                       meta={'cookiejar': response.meta['cookiejar']}
                                       , callback=self.MenuPage, method='POST', formdata=params)
                 yield request
-            if i > 3:
-                break
 
     def MenuPage(self, response):
         rdata = response.body.decode("utf-8")
@@ -116,6 +115,8 @@ class travel_agency(scrapy.Spider):
             yield request
 
     def detailPage(self, response):
+        post = OrderedDict()
+        smallPostList = list()
         # print(response.body.decode("utf-8"))
         goodsName = response.xpath('//*[@id="product"]/div/h3/text()').extract()
         goodsCode = response.xpath('//*[@id="product"]/div/div[1]/div[1]/dl/dd/text()').extract()
@@ -133,32 +134,44 @@ class travel_agency(scrapy.Spider):
         # // *[ @ id = "tab_page1"] / div[4] / div[1]
         # goodsCode = response.xpath('//*[@id="product"]/div/div[1]/div[1]/dl/dd/text()').extract()
 
-        print("상품명 : " + goodsName[0])
-        print("상품코드 : " + goodsCode[0])
+        # print("상품명 : " + goodsName[0])
+        # print("상품코드 : " + goodsCode[0])
+        post["goodsName"] = goodsName[0]
+        post["goodsCode"] = goodsCode[0]
 
-        print("여행기간 : " + str(travelPeriod[0]).strip())
-        print("항공사 : " + airline[0])
+        str_period = str(travelPeriod[0]).strip()
+        # print("여행기간 : " + str_period)
+        post["period"] = str_period
+        # print("항공사 : " + airline[0])
+        post["airline"] = airline[0]
 
-        print("출국 항공번호 : " + departAirNum[0])
-        print("귀국 항공번호 : " + arriveAirNum[0])
+        # print("출국 항공번호 : " + departAirNum[0])
+        # print("귀국 항공번호 : " + arriveAirNum[0])
 
-        print("방문도시 : " + str(travelRoutes[1]).strip())
-        print("총 비용 : " + totalPrice[0])
+        # print("방문도시 : " + str(travelRoutes[1]).strip())
+        visitedCity = str(travelRoutes[1]).strip()
+        post["visitedCity"] = visitedCity
+
+        # print("총 비용 : " + totalPrice[0])
+        post["totalPrice"] = totalPrice[0]
 
         # print("여행 일정 : ", len(detail_Itinerary))
         # str(detail_Itinerary[0])
 
 
         spost = OrderedDict()
+        sp_content_List = list()
+        sp_content = OrderedDict()
 
         for k in range(len(detail_Itinerary)):
             day = response.xpath('//*[ @ id = "anchor_day'+ str(k+1) +'"]/h3/text()').extract()
             date = response.xpath('//*[ @ id = "anchor_day' + str(k+1) + '"]/span/text()').extract()
-            spost["days"] = day[0]
-            spost["dates"] = date[0]
-
-            print("일차 : " + day[0])
-            print("\t날짜 - 지역 : " + date[0])
+            if len(day) > 0:
+                spost["days"] = day[0]
+                # print("일차 : " + day[0])
+            if len(date) > 0:
+                spost["dates"] = date[0]
+                # print("\t날짜 - 지역 : " + date[0])
 
             location = response.xpath('//*[@id="tab_page1"]/div/div['+str(k+1)+']/div/div').extract()
             # print(len(location))
@@ -178,15 +191,22 @@ class travel_agency(scrapy.Spider):
 
                 # // *[ @ id = "tab_page1"] / div[3] / div[1] / div[3] / div / h3
                 if len(tempLocation) > 0:
-                    print("\t\t거점 : " + tempLocation[0] + "size : " + str(len(tempLocation)))
-                    if tempLoc != tempLocation[0]:
+                    # print("\t\t거점 : " + tempLocation[0] + "size : " + str(len(tempLocation)))
+                    if (tempLoc != tempLocation[0]) or (len(tempLocation) > 0):
+                        # print("in if..")
+                        # print("tempLoc : " + tempLoc)
+
                         if len(tempLoc) != 0:
                             includeData = OrderedDict()
-                            includeData[tempLoc] = sp_content
+                            # print('sp_content["Description"] : ' + sp_content["Description"])
+                            includeData[tempLoc] = sp_content_List
                             locationList.append(includeData)
                             # print(json.dumps(locationList, ensure_ascii=False, indent="\t"))
 
-                        print("tempLoc : "+tempLoc + "  tempL[0] : " + tempLocation[0])
+                        # print("tempLoc : "+tempLoc + "  tempL[0] : " + tempLocation[0])
+
+                        sp_content_List = list()
+                        # sp_content_List.clear()
 
                         sp_content = OrderedDict()
                         tempLoc = tempLocation[0]
@@ -196,43 +216,67 @@ class travel_agency(scrapy.Spider):
                     # print(subSchedule)
 
                 if len(schedule) > 0:
-                    print("\t\t일정 설명 : " + schedule[0]+ "size : " + str(len(schedule)))
+                    # print("\t\t일정 설명 : " + schedule[0]+ "size : " + str(len(schedule)))
                     sp_content["Description"] = schedule[0]
+                else:
+                    sp_content["Description"] = None
 
                 if len(subSchedule) > 0:
                     scheduleTxt = re.sub('<[^>]*>', '', str(subSchedule[0])).strip()
-                    print("\t\t추가 설명 : " + scheduleTxt)
+                    # print("\t\t추가 설명 : " + scheduleTxt)
                     sp_content["detail_Description"] = scheduleTxt
+                else:
+                    sp_content["detail_Description"] = None
 
                 # print("\t\t\t추가 설명 : " + nohtmlstr.strip())
                 if len(imageName) > 0:
                     for aa in range(len(imageName)):
-                        print("\t\t사진 이름 : " + imageName[aa])
+                        # print("\t\t사진 이름 : " + imageName[aa])
                         sp_content["pic_name"] = imageName[aa]
 
                         pathList = list()
                         for bb in range(len(imagePath)):
                             pathList.append(imagePath[bb])
-                            print("\t\t사진 경로 : " + imagePath[bb])
+                            # print("\t\t사진 경로 : " + imagePath[bb])
                         sp_content["pic_path"] = pathList
 
                         if len(imageText) > 0:
                             imgDescription = re.sub('<[^>]*>', '', str(imageText[aa])).strip()
-                            print("\t\t사진 설명 : " + imgDescription)
+                            # print("\t\t사진 설명 : " + imgDescription)
                             sp_content["pic_des"] = imgDescription
+                else:
+                    sp_content["pic_name"] = None
+                    sp_content["pic_path"] = None
+                    sp_content["pic_des"] = None
+
+
+                sp_content_List.append(sp_content)
+                sp_content = OrderedDict()
 
 
             # print(locationList)
             # print(json.dumps(locationList, ensure_ascii=False, indent="\t"))
 
+
             includeData2 = OrderedDict()
-            includeData2[tempLoc] = sp_content
+            includeData2[tempLoc] = sp_content_List
             locationList.append(includeData2)
 
             spost["loaction"] = locationList
-            print(json.dumps(spost, ensure_ascii=False, indent="\t"))
+            # print(json.dumps(spost, ensure_ascii=False, indent="\t"))
+            jsonToStr = json.dumps(spost, ensure_ascii=False, indent="\t")
+            strToDict = json.loads(jsonToStr)
+            smallPostList.append(strToDict)
+            # print("spost Size : " + str(len(spost)))
+            # smallPostList.append(spost)
+            # print("spost!!!")
+            # print(spost)
 
             print()
+        post["small_post"] = smallPostList
+        postJson = json.dumps(post, ensure_ascii=False)
+        # print(postJson)
+        pakage.insert(post)
 
     def close(self):
         self.outfile.close()
