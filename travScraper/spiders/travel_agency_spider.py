@@ -19,35 +19,38 @@ class travel_agency(scrapy.Spider):
     def start_requests(self):
 
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-        urls = [
-            'https://www.ybtour.co.kr/CMMN/header.ajax'
-        ]
-        self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
-                              "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
-
-        for i, url in enumerate(urls):
-            yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
+        # urls = [
+        #     'https://www.ybtour.co.kr/CMMN/header.ajax'
+        # ]
+        # self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
+        #                       "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
+        #
+        # for i, url in enumerate(urls):
+        #     yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-        # params = {
-        #     'menu': 'PKG',
-        #     'dspSid': '',
-        #     'evCd': ''
-        # }
-        #
-        # # params.__setitem__('dspSid', "AADC004")
-        # # params.__setitem__('evCd', "CIP1147-191105KE00")
-        #
-        # # params.__setitem__('dspSid', "AAAA002")
-        # # params.__setitem__('evCd', "EWP2318-191026OZ00")
-        #
+        params = {
+            'menu': 'PKG',
+            'dspSid': '',
+            'evCd': ''
+        }
+
+        # params.__setitem__('dspSid', "AADC004")
+        # params.__setitem__('evCd', "CIP1147-191105KE00")
+
+        # params.__setitem__('dspSid', "AAAA002")
+        # params.__setitem__('evCd', "EWP2318-191026OZ00")
+
         # params.__setitem__('dspSid', "ABBC001")
         # params.__setitem__('evCd', "ATF1048-191019KE00")
-        #
-        # request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
-        #                       meta={'cookiejar': 1}
-        #                       , callback=self.detailPage, method='GET', formdata=params)
-        # yield request
+
+        params.__setitem__('dspSid', "")
+        params.__setitem__('evCd', "EWP2228-191102OZ00")
+
+        request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
+                              meta={'cookiejar': 1}
+                              , callback=self.detailPage, method='GET', formdata=params)
+        yield request
         ########################################################################################################################
 
 
@@ -77,6 +80,9 @@ class travel_agency(scrapy.Spider):
                                       meta={'cookiejar': response.meta['cookiejar']}
                                       , callback=self.MenuPage, method='POST', formdata=params)
                 yield request
+
+            # if i > 3:
+            #     break
 
     def MenuPage(self, response):
         rdata = response.body.decode("utf-8")
@@ -136,6 +142,7 @@ class travel_agency(scrapy.Spider):
 
         # print("상품명 : " + goodsName[0])
         # print("상품코드 : " + goodsCode[0])
+        post["agency"] = "노랑풍선"
         post["goodsName"] = goodsName[0]
         post["goodsCode"] = goodsCode[0]
 
@@ -150,7 +157,30 @@ class travel_agency(scrapy.Spider):
 
         # print("방문도시 : " + str(travelRoutes[1]).strip())
         visitedCity = str(travelRoutes[1]).strip()
-        post["visitedCity"] = visitedCity
+        arrVisited = list()
+        # post["visitedCity"] = visitedCity
+        if visitedCity.__contains__("→"):
+            arrVisited = visitedCity.split("→")
+        elif  visitedCity.__contains__("/"):
+            arrVisited = visitedCity.split("/")
+        if arrVisited.__len__() > 0:
+            for a in range(0, (arrVisited.__len__() - 1)):
+                arrVisited[a] = arrVisited[a].strip()+" "
+                if arrVisited[a].__contains__("(") :
+                    arrVisited[a] = str(arrVisited[a])[:arrVisited[a].index("(")]+" "
+
+            if arrVisited[0] == arrVisited.__getitem__(arrVisited.__len__()-1):
+                forsize = arrVisited.__len__()-2
+            else:
+                forsize = arrVisited.__len__()-1
+
+            returnVal = ""
+            for a in range(0 ,forsize):
+                returnVal += arrVisited[a]
+            post["visitedCity"] = returnVal
+            returnVal = str(returnVal).replace("/", " ")
+            print("val : " + returnVal)
+
 
         # print("총 비용 : " + totalPrice[0])
         post["totalPrice"] = totalPrice[0]
@@ -170,7 +200,10 @@ class travel_agency(scrapy.Spider):
                 spost["days"] = day[0]
                 # print("일차 : " + day[0])
             if len(date) > 0:
-                spost["dates"] = date[0]
+                if str(date[0]).__contains__("-"):
+                    spost["dates"] = str(date[0])[:str(date[0]).index("-")].__str__().strip()
+                else:
+                    spost["dates"] = date[0]
                 # print("\t날짜 - 지역 : " + date[0])
 
             location = response.xpath('//*[@id="tab_page1"]/div/div['+str(k+1)+']/div/div').extract()
@@ -250,7 +283,8 @@ class travel_agency(scrapy.Spider):
                     sp_content["pic_des"] = None
 
 
-                sp_content_List.append(sp_content)
+                if ((sp_content["Description"] == None) and (sp_content["detail_Description"] == None) and (sp_content["pic_name"] == None) and (sp_content["pic_path"] == None) and (sp_content["pic_des"] == None)) == False:
+                    sp_content_List.append(sp_content)
                 sp_content = OrderedDict()
 
 
@@ -264,6 +298,12 @@ class travel_agency(scrapy.Spider):
 
             spost["loaction"] = locationList
             # print(json.dumps(spost, ensure_ascii=False, indent="\t"))
+
+            # 작업중.. 자꾸 마지막 노드가 똑같이 들어가는 것들이 있음. 그런걸 쳐내야함.
+            if locationList.__len__() > 0:
+                if spost["day"] != locationList.__getitem__(locationList.__len__()-1)["day"]:
+                    print("같음!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
             jsonToStr = json.dumps(spost, ensure_ascii=False, indent="\t")
             strToDict = json.loads(jsonToStr)
             smallPostList.append(strToDict)
@@ -272,12 +312,12 @@ class travel_agency(scrapy.Spider):
             # print("spost!!!")
             # print(spost)
 
-            print()
+            # print()
         post["small_post"] = smallPostList
-        postJson = json.dumps(post, ensure_ascii=False)
-        # print(postJson)
-        pakage.insert(post)
-
+        postJson = json.dumps(post, ensure_ascii=False, indent="\t")
+        print(postJson)
+        # pakage.insert(post)
+    
     def close(self):
         self.outfile.close()
         print("-----Check to see if this is closed-----")
