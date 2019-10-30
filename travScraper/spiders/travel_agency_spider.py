@@ -6,7 +6,7 @@ from travScraper.spiders.dbinfo import mongoip, mongopwd, mongoid
 
 conn = pymongo.MongoClient('mongodb://'+ mongoid +':'+mongopwd+'@'+mongoip, 30121)
 db = conn.get_database('trav')
-pakage = db.get_collection('pakage')
+mongoPakage= db.get_collection('pakage')
 
 class travel_agency(scrapy.Spider):
     name = "agencyCrawler"  # spider 이름
@@ -19,38 +19,38 @@ class travel_agency(scrapy.Spider):
     def start_requests(self):
 
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-        # urls = [
-        #     'https://www.ybtour.co.kr/CMMN/header.ajax'
-        # ]
-        # self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
-        #                       "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
-        #
-        # for i, url in enumerate(urls):
-        #     yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
+        urls = [
+            'https://www.ybtour.co.kr/CMMN/header.ajax'
+        ]
+        self.writer.writerow(["상품명", "상품코드", "종속 메뉴코드", "메뉴코드", "항공코드", "항공사",
+                              "상품 이미지", "최소 가격", "최대 가격", "최소 출발 날짜", "최대 출발 날짜"])
+
+        for i, url in enumerate(urls):
+            yield scrapy.Request(url=url, meta={'cookiejar':i} ,callback=self.allMenuParse)
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-        params = {
-            'menu': 'PKG',
-            'dspSid': '',
-            'evCd': ''
-        }
-
-        # params.__setitem__('dspSid', "AADC004")
-        # params.__setitem__('evCd', "CIP1147-191105KE00")
-
+        # params = {
+        #     'menu': 'PKG',
+        #     'dspSid': '',
+        #     'evCd': ''
+        # }
+        #
+        # # params.__setitem__('dspSid', "AADC004")
+        # # params.__setitem__('evCd', "CIP1147-191105KE00")
+        #
+        # # params.__setitem__('dspSid', "AAAA002")
+        # # params.__setitem__('evCd', "EWP2318-191026OZ00")
+        #
+        # # params.__setitem__('dspSid', "ABBC001")
+        # # params.__setitem__('evCd', "ATF1048-191019KE00")
+        #
         # params.__setitem__('dspSid', "AAAA002")
-        # params.__setitem__('evCd', "EWP2318-191026OZ00")
-
-        # params.__setitem__('dspSid', "ABBC001")
-        # params.__setitem__('evCd', "ATF1048-191019KE00")
-
-        params.__setitem__('dspSid', "")
-        params.__setitem__('evCd', "EWP2228-191102OZ00")
-
-        request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
-                              meta={'cookiejar': 1}
-                              , callback=self.detailPage, method='GET', formdata=params)
-        yield request
+        # params.__setitem__('evCd', "EWP2228-191102OZ00")
+        #
+        # request = FormRequest("https://www.ybtour.co.kr/product/detailPackage.yb?",
+        #                       meta={'cookiejar': 1}
+        #                       , callback=self.detailPage, method='GET', formdata=params)
+        # yield request
         ########################################################################################################################
 
 
@@ -81,8 +81,8 @@ class travel_agency(scrapy.Spider):
                                       , callback=self.MenuPage, method='POST', formdata=params)
                 yield request
 
-            # if i > 3:
-            #     break
+            if i > 3:
+                break
 
     def MenuPage(self, response):
         rdata = response.body.decode("utf-8")
@@ -179,11 +179,11 @@ class travel_agency(scrapy.Spider):
                 returnVal += arrVisited[a]
             post["visitedCity"] = returnVal
             returnVal = str(returnVal).replace("/", " ")
-            print("val : " + returnVal)
+            # print("val : " + returnVal)
 
-
-        # print("총 비용 : " + totalPrice[0])
-        post["totalPrice"] = totalPrice[0]
+        Tprice = int(str(totalPrice[0]).replace(",",""))
+        # print("총 비용 : " + str(Tprice))
+        post["totalPrice"] = Tprice
 
         # print("여행 일정 : ", len(detail_Itinerary))
         # str(detail_Itinerary[0])
@@ -197,7 +197,7 @@ class travel_agency(scrapy.Spider):
             day = response.xpath('//*[ @ id = "anchor_day'+ str(k+1) +'"]/h3/text()').extract()
             date = response.xpath('//*[ @ id = "anchor_day' + str(k+1) + '"]/span/text()').extract()
             if len(day) > 0:
-                spost["days"] = day[0]
+                spost["days"] = str(day[0]).strip()
                 # print("일차 : " + day[0])
             if len(date) > 0:
                 if str(date[0]).__contains__("-"):
@@ -231,6 +231,8 @@ class travel_agency(scrapy.Spider):
 
                         if len(tempLoc) != 0:
                             includeData = OrderedDict()
+                            tempLoc = str(tempLoc).strip()
+                            # print("tempLoc : " + tempLoc)
                             # print('sp_content["Description"] : ' + sp_content["Description"])
                             includeData[tempLoc] = sp_content_List
                             locationList.append(includeData)
@@ -293,6 +295,7 @@ class travel_agency(scrapy.Spider):
 
 
             includeData2 = OrderedDict()
+            tempLoc = str(tempLoc).strip()
             includeData2[tempLoc] = sp_content_List
             locationList.append(includeData2)
 
@@ -300,23 +303,22 @@ class travel_agency(scrapy.Spider):
             # print(json.dumps(spost, ensure_ascii=False, indent="\t"))
 
             # 작업중.. 자꾸 마지막 노드가 똑같이 들어가는 것들이 있음. 그런걸 쳐내야함.
-            if locationList.__len__() > 0:
-                if spost["day"] != locationList.__getitem__(locationList.__len__()-1)["day"]:
-                    print("같음!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            if smallPostList.__len__() > 0:
+                jsonToStr2 = json.dumps(spost, ensure_ascii=False, indent="\t")
+                strToDict2 = json.loads(jsonToStr2)
 
-            jsonToStr = json.dumps(spost, ensure_ascii=False, indent="\t")
-            strToDict = json.loads(jsonToStr)
-            smallPostList.append(strToDict)
-            # print("spost Size : " + str(len(spost)))
-            # smallPostList.append(spost)
-            # print("spost!!!")
-            # print(spost)
+                if smallPostList.__getitem__(smallPostList.__len__() - 1)["days"] != strToDict2["days"] :
+                    smallPostList.append(strToDict2)
 
-            # print()
+            elif smallPostList.__len__() == 0:
+                jsonToStr = json.dumps(spost, ensure_ascii=False, indent="\t")
+                strToDict = json.loads(jsonToStr)
+                smallPostList.append(strToDict)
+
         post["small_post"] = smallPostList
         postJson = json.dumps(post, ensure_ascii=False, indent="\t")
         print(postJson)
-        # pakage.insert(post)
+        # mongoPakage.insert(post)
     
     def close(self):
         self.outfile.close()
